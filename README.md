@@ -65,7 +65,7 @@ pediatric-gait-rehab-mujoco/
 저장소를 복제한 뒤 모든 명령은 저장소 최상위 디렉터리에서 실행합니다.
 
 ```bash
-git clone https://github.com/<GitHub-ID>/pediatric-gait-rehab-mujoco.git
+git clone https://github.com/hyungseok-ryu/pediatric-gait-rehab-mujoco.git
 cd pediatric-gait-rehab-mujoco
 ```
 
