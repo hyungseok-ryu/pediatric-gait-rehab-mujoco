@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Environments
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+env/
+
+# Local tooling and editor state
+.agents/
+.codex/
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# MuJoCo / simulation generated artifacts
+MUJOCO_LOG.TXT
+outputs/
+*.mp4
+*.avi
+*.mkv
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files created by office applications
+~$*.xlsx
+~$*.docx
+
+# Source workbook: keep local until redistribution permission is confirmed
+data/sagittal_cycle_metrics.xlsx

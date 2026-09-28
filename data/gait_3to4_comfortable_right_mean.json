@@ -1,0 +1,37 @@
+{
+  "source_workbook": "sagittal_cycle_metrics.xlsx",
+  "source_sheet": "3-4 Cycle Waves",
+  "condition": "Comfortable",
+  "side": "Right",
+  "joints": [
+    "Hip",
+    "Knee"
+  ],
+  "variable": "Angle (deg)",
+  "subject_ids": [
+    "HCC013",
+    "HCC014",
+    "HCC015",
+    "HCC060"
+  ],
+  "n_subjects": 4,
+  "age_composition": {
+    "3 years": 1,
+    "4 years": 3
+  },
+  "mean_age_years": 3.75,
+  "source_mean_height_m": 1.01175,
+  "source_mean_weight_kg": 16.2,
+  "mean_stride_time_s": 0.7775,
+  "individual_stride_times_s": {
+    "HCC013": 0.7,
+    "HCC014": 0.83,
+    "HCC015": 0.76,
+    "HCC060": 0.82
+  },
+  "n_gait_points": 100,
+  "hip_min_deg": -10.128462995200874,
+  "hip_max_deg": 44.21412970756003,
+  "knee_min_deg": 5.772940025567878,
+  "knee_max_deg": 76.27657120648438
+}
