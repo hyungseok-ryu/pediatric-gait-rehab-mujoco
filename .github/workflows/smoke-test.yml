@@ -35,6 +35,9 @@ jobs:
       - name: Compile Python sources
         run: python -m compileall -q src
 
+      - name: Test rehabilitation modes
+        run: python -m unittest discover -s tests -v
+
       - name: Check batch configuration
         run: python src/run_batch.py --dry-run --max-runs 1
 

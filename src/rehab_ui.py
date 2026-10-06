@@ -6,7 +6,7 @@
 
 Tk UI와 MuJoCo viewer는 서로 다른 프로세스에서 실행된다. UI의 shared mapping을
 시뮬레이션이 주기적으로 읽어 치료 모드, cadence, 관절별 보조량을 즉시 반영한다.
-Active-Assist의 patient effort는 실제 센서가 연결되기 전 검증용 가상 입력이다.
+Active mode의 patient effort는 실제 센서가 연결되기 전 검증용 가상 입력이다.
 """
 
 from __future__ import annotations
@@ -45,9 +45,10 @@ FONT = "Noto Sans CJK KR"
 
 STATE_LABELS = {
     "initializing": "모델 준비 중",
-    "stand_hold": "기립 유지",
-    "walk_guided": "로봇 보행",
-    "walk_active_assist": "능동 보조 보행",
+    "stand_hold": "기립 대기",
+    "automatic": "Automatic · 자동 보행",
+    "active": "Active · 능동 보행",
+    "sit_to_stand": "Sit-to-Stand · 앉기-서기",
     "safe_stop": "안전 정지",
     "finished": "세션 종료",
 }
@@ -76,7 +77,7 @@ def _simulation_entry(control, kwargs: dict) -> None:
 
 
 class RehabControlApp:
-    """Trexo식 핵심 설정을 반영한 연구용 보행재활 제어 화면."""
+    """세 가지 재활 운동을 제공하는 연구용 보행재활 제어 화면."""
 
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
@@ -99,6 +100,9 @@ class RehabControlApp:
         self.cadence_var = tk.DoubleVar(value=40.0)
         self.soft_start_var = tk.DoubleVar(value=2.0)
         self.effort_var = tk.DoubleVar(value=0.0)
+        self.effort_threshold_var = tk.DoubleVar(value=20.0)
+        self.sit_to_stand_duration_var = tk.DoubleVar(value=3.0)
+        self.phase_title_var = tk.StringVar(value="보행 위상")
         self.support_vars = {
             "right_hip_support": tk.DoubleVar(value=100.0),
             "right_knee_support": tk.DoubleVar(value=100.0),
@@ -558,8 +562,8 @@ class RehabControlApp:
     def _build_control_panel(self, parent: tk.Frame) -> None:
         modes = self._card(
             parent,
-            "보행 제어 모드",
-            "기립에서 시작한 뒤 치료 목적에 맞는 보행 모드를 선택하세요.",
+            "재활 제어 모드",
+            "자동 보행, 환자 힘 기반 진행 또는 앉기-서기를 선택하세요.",
         )
         mode_content = tk.Frame(modes, bg=CARD)
         mode_content.pack(fill="x", padx=18, pady=(0, 18))
@@ -568,19 +572,19 @@ class RehabControlApp:
 
         self.mode_buttons: dict[str, tk.Button] = {}
         mode_specs = (
-            ("stand_hold", "기립 유지", "보행 위상 정지"),
-            ("walk_guided", "로봇 보행", "연속 보조"),
-            ("walk_active_assist", "능동 보조", "환자 움직임 감지"),
+            ("automatic", "Automatic", "자동 보행"),
+            ("active", "Active", "힘 기준 진행"),
+            ("sit_to_stand", "Sit-to-Stand", "앉기-서기 1회"),
         )
         for col, (mode, title, desc) in enumerate(mode_specs):
             button = tk.Button(
                 mode_content,
                 text=f"{title}\n{desc}",
                 command=lambda m=mode: self._set_mode(m),
-                bg="#C8D2D8" if mode == "stand_hold" else "#D8D8D8",
+                bg="#D8D8D8",
                 activebackground="#C0C0C0",
                 fg=INK,
-                relief="sunken" if mode == "stand_hold" else "raised",
+                relief="raised",
                 bd=2,
                 height=3,
                 wraplength=125,
@@ -604,7 +608,7 @@ class RehabControlApp:
         )
         self.safe_button.grid(row=1, column=0, columnspan=3, sticky="ew", padx=4, pady=(10, 0))
 
-        gait = self._card(parent, "보행 설정", "보행 속도와 좌우 관절 보조율 설정")
+        gait = self._card(parent, "제어 설정", "보행 속도, 동작 시간과 좌우 관절 보조율")
         gait_content = tk.Frame(gait, bg=CARD)
         gait_content.pack(fill="both", expand=True, padx=18, pady=(0, 16))
 
@@ -623,6 +627,18 @@ class RehabControlApp:
             self.soft_start_var,
             0.5,
             5.0,
+            " s",
+            self._control_changed,
+            compact=True,
+            decimals=1,
+            resolution=0.1,
+        )
+        self._scale_row(
+            gait_content,
+            "앉기-서기 상승 시간",
+            self.sit_to_stand_duration_var,
+            1.5,
+            8.0,
             " s",
             self._control_changed,
             compact=True,
@@ -677,7 +693,7 @@ class RehabControlApp:
         effort_box.pack(fill="x", pady=(13, 0))
         tk.Label(
             effort_box,
-            text="능동 보조 시험 입력",
+            text="Active mode 시험 입력",
             bg=AMBER_SOFT,
             fg=AMBER,
             font=(FONT, 9, "bold"),
@@ -686,10 +702,21 @@ class RehabControlApp:
         effort_inner.pack(fill="x", padx=12, pady=(0, 8))
         self._scale_row(
             effort_inner,
-            "환자 움직임 입력 (시작 기준 20%)",
+            "환자 힘 입력",
             self.effort_var,
             0,
             100,
+            " %",
+            self._control_changed,
+            compact=True,
+            background=AMBER_SOFT,
+        )
+        self._scale_row(
+            effort_inner,
+            "진행 기준",
+            self.effort_threshold_var,
+            5,
+            80,
             " %",
             self._control_changed,
             compact=True,
@@ -775,11 +802,11 @@ class RehabControlApp:
         metrics.grid_columnconfigure(0, weight=1)
         metrics.grid_columnconfigure(1, weight=1)
         self._metric(metrics, 0, 0, "세션 시간", self.telemetry_vars["session"])
-        self._metric(metrics, 0, 1, "걸음 수", self.telemetry_vars["steps"])
+        self._metric(metrics, 0, 1, "걸음 / 반복", self.telemetry_vars["steps"])
 
         tk.Label(
             content,
-            text="보행 위상",
+            textvariable=self.phase_title_var,
             bg=CARD,
             fg=MUTED,
             font=(FONT, 8, "bold"),
@@ -826,9 +853,8 @@ class RehabControlApp:
         tk.Label(
             parent,
             text=(
-                "능동 보조 모드의 환자 움직임 입력은 센서 대신 사용하는 "
-                "시험값입니다. 실제 장치에서는 모터 전류, 상호작용 토크, "
-                "발 접촉 센서값을 사용해야 합니다."
+                "Active mode의 환자 힘 입력은 센서 대신 사용하는 시험값입니다. "
+                "실제 장치에서는 검증된 힘·토크 센서와 안전 조건이 필요합니다."
             ),
             bg=BG,
             fg=MUTED,
@@ -875,7 +901,9 @@ class RehabControlApp:
             "cadence_spm": float(self.cadence_var.get()),
             "soft_start_duration": float(self.soft_start_var.get()),
             "patient_effort": float(self.effort_var.get()),
-            "initiation_threshold": 20.0,
+            "initiation_threshold": float(self.effort_threshold_var.get()),
+            "sit_to_stand_duration": float(self.sit_to_stand_duration_var.get()),
+            "sit_to_stand_request_id": 0,
             "alarm": "",
         }
         values.update({key: float(var.get()) for key, var in self.support_vars.items()})
@@ -973,6 +1001,10 @@ class RehabControlApp:
             self.control["alarm"] = ""
             self._alarm_shown = ""
         self.control["requested_state"] = mode
+        if mode == "sit_to_stand":
+            self.control["sit_to_stand_request_id"] = int(
+                self.control.get("sit_to_stand_request_id", 0)
+            ) + 1
         self._set_mode_visual(mode)
 
     def _set_mode_visual(self, active: str) -> None:
@@ -985,7 +1017,7 @@ class RehabControlApp:
             )
         if active == "safe_stop":
             self.mode_banner.configure(bg="#FCECEC", fg=RED)
-        elif active in {"walk_guided", "walk_active_assist"}:
+        elif active in {"automatic", "active", "sit_to_stand"}:
             self.mode_banner.configure(bg="#C8D2D8", fg=INK)
         else:
             self.mode_banner.configure(bg="#D7D7D7", fg=INK)
@@ -999,6 +1031,12 @@ class RehabControlApp:
                 self.soft_start_var.get()
             )
             self.control["patient_effort"] = float(self.effort_var.get())
+            self.control["initiation_threshold"] = float(
+                self.effort_threshold_var.get()
+            )
+            self.control["sit_to_stand_duration"] = float(
+                self.sit_to_stand_duration_var.get()
+            )
             for key, var in self.support_vars.items():
                 self.control[key] = float(var.get())
         except (BrokenPipeError, ConnectionError, EOFError, tk.TclError):
@@ -1044,13 +1082,36 @@ class RehabControlApp:
                 status = str(self.control.get("status", "initializing"))
                 actual = str(self.control.get("actual_state", "initializing"))
                 self._set_status(status)
-                self.telemetry_vars["mode"].set(STATE_LABELS.get(actual, actual.upper()))
+                mode_label = STATE_LABELS.get(actual, actual.upper())
+                if actual == "active" and bool(
+                    self.control.get("active_gate_blocked", False)
+                ):
+                    mode_label = "Active · 환자 힘 입력 대기"
+                elif actual == "sit_to_stand":
+                    stage = str(self.control.get("sit_to_stand_stage", ""))
+                    stage_labels = {
+                        "preparing": "앉은 자세 준비",
+                        "seated_hold": "앉은 자세 유지",
+                        "rising": "일어서기",
+                        "complete": "기립 완료",
+                    }
+                    if stage in stage_labels:
+                        mode_label = f"Sit-to-Stand · {stage_labels[stage]}"
+                self.telemetry_vars["mode"].set(mode_label)
                 self._set_mode_visual(actual)
 
                 sim_time = float(self.control.get("sim_time", 0.0))
                 phase = float(self.control.get("gait_phase_pct", 0.0))
                 self.telemetry_vars["session"].set(self._format_time(sim_time))
-                self.telemetry_vars["steps"].set(str(int(self.control.get("step_count", 0))))
+                count = (
+                    int(self.control.get("sit_to_stand_repetitions", 0))
+                    if actual == "sit_to_stand"
+                    else int(self.control.get("step_count", 0))
+                )
+                self.telemetry_vars["steps"].set(str(count))
+                self.phase_title_var.set(
+                    "동작 진행" if actual == "sit_to_stand" else "보행 위상"
+                )
                 self.telemetry_vars["phase"].set(f"{phase:.0f} %")
                 self.phase_bar["value"] = phase
 

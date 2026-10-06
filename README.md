@@ -15,7 +15,7 @@
 - 고관절·무릎 동축 외골격형과 발목 추종 말단 구동형 구조
 - 3–4세 소아 평균 보행각 기반의 교대보행
 - 좌우 고관절·무릎 구동 범위와 보조율의 독립 설정
-- 기립 유지, 로봇 주도 보행, 능동 보조 및 안전 정지 모드
+- Automatic, effort-gated Active, Sit-to-Stand 및 안전 정지 모드
 - 안전 정지 또는 기립 상태에서 보행으로 전환할 때 S-curve 부드러운 시작
 - MuJoCo viewer를 사용하는 한글 데스크톱 UI
 - 단일 실행, 배치 실행 및 open-chain 링크 길이 sweep
@@ -41,6 +41,7 @@ pediatric-gait-rehab-mujoco/
 │   ├── run_batch.py          # 배치 시뮬레이션
 │   ├── extract_pediatric_mean_gait.py
 │   └── sweep_open_chain_extensions.py
+├── tests/                    # 세 가지 재활 모드의 headless 회귀 시험
 ├── .gitignore
 ├── requirements.txt
 └── README.md
@@ -119,6 +120,12 @@ python src/simulate.py --render none --cycles 1 --outdir smoke_test
 outputs/smoke_test/torque_profile.csv
 ```
 
+세 가지 재활 모드의 headless 회귀 시험은 다음과 같이 실행합니다.
+
+```bash
+python -m unittest discover -s tests -v
+```
+
 명령행 옵션을 확인하려면 다음을 실행합니다.
 
 ```bash
@@ -139,8 +146,20 @@ mjpython src/rehab_ui.py
 
 UI에서 세션 시작 전에 체형, 로봇 구조와 좌우 관절 구동 범위를 설정합니다.
 기본 관절 범위는 현재 입력 데이터에 여유를 둔 고관절 `-15~50°`, 무릎
-`0~80°`입니다. 실행 중에는 보행 모드, 보행 속도, 부드러운 시작 시간,
-좌우 관절 보조율과 가상 환자 움직임 입력을 조절할 수 있습니다.
+`0~80°`입니다. 실행 중에는 재활 모드, 보행 속도, 부드러운 시작 시간,
+Sit-to-Stand 상승 시간, 좌우 관절 보조율, 가상 환자 힘 입력과 진행 기준을
+조절할 수 있습니다.
+
+재활 모드는 다음과 같이 동작합니다.
+
+- **Automatic:** 건강한 소아의 기준 hip/knee 보행 궤적을 설정 속도로 계속 추종합니다.
+- **Active:** 같은 궤적을 사용하되 매 swing 시작 시 환자 힘 입력이 설정 기준을 한 번 넘어야 다음 자세로 진행합니다. 기준 미만이면 현재 보행 자세를 유지합니다.
+- **Sit-to-Stand:** 앉은 자세를 준비한 후 설정 시간에 맞춰 양측 hip/knee를 기립자세로 전환하는 1회 운동입니다. 버튼을 다시 누르면 반복합니다.
+
+현재 모델은 골반 고정 및 무지면 접촉 구조이므로 Sit-to-Stand는 체중부하 동작의
+생체역학 모델이 아니라 관절 전환 궤적과 로봇 추종을 확인하는 연구용 시연입니다.
+세 모드의 구체적인 제어 가정은
+[material/control_architecture.md](material/control_architecture.md)에 정리되어 있습니다.
 
 관절 범위는 다음 두 곳에 함께 적용됩니다.
 

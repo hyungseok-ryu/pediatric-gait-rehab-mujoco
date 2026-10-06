@@ -87,6 +87,15 @@ def _finite_diff(arr: np.ndarray, dt: float) -> np.ndarray:
     return vel
 
 
+def _quintic_profile(elapsed: float, duration: float) -> tuple[float, float]:
+    """양 끝에서 속도와 가속도가 0인 진행률과 진행률 속도를 반환한다."""
+    duration = max(float(duration), np.finfo(float).eps)
+    u = float(np.clip(elapsed / duration, 0.0, 1.0))
+    position = 10.0 * u**3 - 15.0 * u**4 + 6.0 * u**5
+    velocity = (30.0 * u**2 - 60.0 * u**3 + 30.0 * u**4) / duration
+    return position, velocity
+
+
 def _contralateral_trajectory(
     values: np.ndarray,
     cycle_duration: float,
@@ -628,6 +637,31 @@ def run_simulation(
         hip_pos=left_hip_global,
         scale_factor=scale,
     )[0]
+
+    # Sit-to-Stand의 앉은 자세는 임상 궤적이 제공되지 않은 현재 연구용
+    # 모델의 명시적 가정이다. 이상값(hip 45°, knee 75°)을 환자별 ROM으로
+    # 제한하여 좌우 각각 적용한다. 골반이 고정된 모델이므로 실제 체중부하
+    # 일어서기가 아니라 hip/knee 전환 궤적의 시각·제어 검증에 해당한다.
+    def bounded_sit_angle(name: str, ideal_deg: float) -> float:
+        if range_limit_enabled:
+            minimum, maximum = joint_ranges_deg[name]
+            ideal_deg = float(np.clip(ideal_deg, minimum, maximum))
+        return float(np.deg2rad(ideal_deg))
+
+    right_sit_pose = np.array(
+        [
+            bounded_sit_angle("right_hip", 45.0),
+            bounded_sit_angle("right_knee", 75.0),
+        ],
+        dtype=float,
+    )
+    left_sit_pose = np.array(
+        [
+            bounded_sit_angle("left_hip", 45.0),
+            bounded_sit_angle("left_knee", 75.0),
+        ],
+        dtype=float,
+    )
 
     # 목표 각속도 (유한 차분)
     hip_vel_des  = _finite_diff(traj.hip_angle,  cfg.SIM_TIMESTEP)
@@ -1218,9 +1252,10 @@ def run_simulation(
     # IK 실패 카운터
     ik_fail_count = 0
 
-    # UI 실행에서는 시뮬레이션 시간과 보행 위상을 분리한다. 기립/일시정지
-    # 중에도 물리는 계속 계산하되 gait_cursor만 멈추므로 재개 시 궤적이
-    # 갑자기 건너뛰지 않는다. cadence는 1 gait cycle = 2 steps로 환산한다.
+    # UI 실행에서는 시뮬레이션 시간과 동작 진행률을 분리한다. Active는
+    # swing 구간에서 환자 힘이 기준 미만일 때 현재 gait reference를 그대로
+    # 유지하고, Automatic은 같은 reference를 설정 속도로 계속 진행한다.
+    # cadence는 1 gait cycle = 2 steps로 환산한다.
     cycle_steps = max(2, int(round(traj.cycle_duration / cfg.SIM_TIMESTEP)))
     nominal_cadence_spm = 120.0 / traj.cycle_duration
     gait_cursor = 0.0
@@ -1230,11 +1265,30 @@ def run_simulation(
     patient_effort = 0.0
     initiation_threshold = 20.0
     soft_start_duration = 2.0
+    sit_to_stand_duration = 3.0
+    sit_to_stand_request_id = 0
+    previous_sit_to_stand_request_id = 0
+    sit_to_stand_elapsed = 0.0
+    sit_to_stand_stage = "complete"
+    sit_to_stand_progress = 100.0
+    sit_to_stand_repetitions = 0
+    sit_to_stand_completed = True
+    sit_to_stand_hold_duration = 1.0
+    active_swing_window = ""
+    active_swing_authorized = False
+    sit_to_stand_entry_right = np.array(
+        [data.qpos[hip_qpos_id], data.qpos[knee_qpos_id]], dtype=float
+    )
+    sit_to_stand_entry_left = np.array(
+        [data.qpos[left_hip_qpos_id], data.qpos[left_knee_qpos_id]],
+        dtype=float,
+    )
+    previous_dynamic_right_robot_target = stand_robot_targets.copy()
+    previous_dynamic_left_robot_target = left_stand_robot_targets.copy()
     right_hip_support = right_knee_support = 1.0
     left_hip_support = left_knee_support = 1.0
     tracking_alarm = False
     previous_runtime_state = runtime_state
-    previous_motion_enabled = False
     resume_from_safe_stop = False
     transition_elapsed = soft_start_duration
     transition_start = np.array(
@@ -1243,6 +1297,15 @@ def run_simulation(
             data.qpos[m2_qpos_id],
             data.qpos[left_m1_qpos_id],
             data.qpos[left_m2_qpos_id],
+        ],
+        dtype=float,
+    )
+    human_transition_start = np.array(
+        [
+            data.qpos[hip_qpos_id],
+            data.qpos[knee_qpos_id],
+            data.qpos[left_hip_qpos_id],
+            data.qpos[left_knee_qpos_id],
         ],
         dtype=float,
     )
@@ -1262,12 +1325,33 @@ def run_simulation(
                 runtime_state = str(
                     runtime_control.get("requested_state", "stand_hold")
                 )
+                # 이전 UI 세션에서 저장된 명칭도 새 제어 철학으로 해석한다.
+                runtime_state = {
+                    "walk_guided": "automatic",
+                    "walk_active_assist": "active",
+                }.get(runtime_state, runtime_state)
+                if runtime_state not in {
+                    "stand_hold",
+                    "automatic",
+                    "active",
+                    "sit_to_stand",
+                    "safe_stop",
+                }:
+                    runtime_state = "stand_hold"
                 cadence_spm = float(runtime_control.get("cadence_spm", 40.0))
                 patient_effort = float(
                     runtime_control.get("patient_effort", 0.0)
                 )
                 initiation_threshold = float(
                     runtime_control.get("initiation_threshold", 20.0)
+                )
+                sit_to_stand_duration = np.clip(
+                    float(runtime_control.get("sit_to_stand_duration", 3.0)),
+                    1.5,
+                    8.0,
+                )
+                sit_to_stand_request_id = int(
+                    runtime_control.get("sit_to_stand_request_id", 0)
                 )
                 soft_start_duration = np.clip(
                     float(runtime_control.get("soft_start_duration", 2.0)),
@@ -1299,16 +1383,54 @@ def run_simulation(
 
         if interactive:
             step = int(gait_cursor) % cycle_steps
-            guided = runtime_state == "walk_guided"
-            active_ready = (
-                runtime_state == "walk_active_assist"
-                and patient_effort >= initiation_threshold
+            gait_mode = runtime_state in {"automatic", "active"}
+            reference_active = gait_mode or runtime_state == "sit_to_stand"
+
+            # 오른쪽 보행 주기 기준 오른쪽 swing=60~100%, 50% 앞선 왼쪽
+            # swing=10~50%로 둔다. Active에서는 swing 동안에만 힘 기준을
+            # 적용하고, 기준 미만이면 현재 reference 위치에서 기다린다.
+            gait_phase_fraction = gait_cursor / cycle_steps
+            current_swing_window = (
+                "left"
+                if 0.10 <= gait_phase_fraction < 0.50
+                else "right"
+                if 0.60 <= gait_phase_fraction < 1.0
+                else ""
             )
-            motion_enabled = guided or active_ready
-            if (
+            active_swing_phase = bool(current_swing_window)
+            if runtime_state != "active":
+                active_swing_window = ""
+                active_swing_authorized = False
+            elif (
                 runtime_state != previous_runtime_state
-                or motion_enabled != previous_motion_enabled
+                or current_swing_window != active_swing_window
             ):
+                # 매 swing 진입 때 한 번 잠그고, 힘 기준을 통과하면 해당
+                # swing이 끝날 때까지 진행 허가를 유지하여 센서 chatter로
+                # 궤적이 반복 정지하는 것을 막는다.
+                active_swing_window = current_swing_window
+                active_swing_authorized = False
+            if (
+                runtime_state == "active"
+                and current_swing_window
+                and patient_effort >= initiation_threshold
+            ):
+                active_swing_authorized = True
+            active_gate_blocked = (
+                runtime_state == "active"
+                and active_swing_phase
+                and not active_swing_authorized
+            )
+            phase_can_advance = (
+                runtime_state == "automatic"
+                or (runtime_state == "active" and not active_gate_blocked)
+            )
+            sit_to_stand_retriggered = (
+                runtime_state == "sit_to_stand"
+                and sit_to_stand_request_id
+                != previous_sit_to_stand_request_id
+            )
+            if runtime_state != previous_runtime_state or sit_to_stand_retriggered:
                 # 상태 전환 순간의 실제 관절각을 새 궤적의 출발점으로 사용한다.
                 # Safety Stop 중 자세가 변해도 재시작 목표가 순간이동하지 않는다.
                 transition_start = np.array(
@@ -1320,13 +1442,38 @@ def run_simulation(
                     ],
                     dtype=float,
                 )
+                human_transition_start = np.array(
+                    [
+                        data.qpos[hip_qpos_id],
+                        data.qpos[knee_qpos_id],
+                        data.qpos[left_hip_qpos_id],
+                        data.qpos[left_knee_qpos_id],
+                    ],
+                    dtype=float,
+                )
                 transition_elapsed = 0.0
                 resume_from_safe_stop = (
                     previous_runtime_state == "safe_stop"
                     and runtime_state != "safe_stop"
                 )
+                if runtime_state == "sit_to_stand":
+                    sit_to_stand_elapsed = 0.0
+                    sit_to_stand_completed = False
+                    sit_to_stand_stage = "preparing"
+                    sit_to_stand_progress = 0.0
+                    sit_to_stand_entry_right = np.array(
+                        [data.qpos[hip_qpos_id], data.qpos[knee_qpos_id]],
+                        dtype=float,
+                    )
+                    sit_to_stand_entry_left = np.array(
+                        [
+                            data.qpos[left_hip_qpos_id],
+                            data.qpos[left_knee_qpos_id],
+                        ],
+                        dtype=float,
+                    )
                 previous_runtime_state = runtime_state
-                previous_motion_enabled = motion_enabled
+                previous_sit_to_stand_request_id = sit_to_stand_request_id
 
             transition_u = float(
                 np.clip(transition_elapsed / soft_start_duration, 0.0, 1.0)
@@ -1342,7 +1489,7 @@ def run_simulation(
             phase_increment = (
                 max(0.0, cadence_spm) / nominal_cadence_spm
                 * transition_weight
-                if motion_enabled
+                if phase_can_advance
                 else 0.0
             )
             velocity_scale = phase_increment
@@ -1350,37 +1497,152 @@ def run_simulation(
             step = simulation_step
             phase_increment = 1.0
             velocity_scale = 1.0
-            motion_enabled = True
+            gait_mode = True
+            reference_active = True
+            active_swing_phase = False
+            active_gate_blocked = False
             transition_weight = 1.0
             transition_weight_dot = 0.0
 
         # ── 4-a. 사람 다리 position actuator 목표 설정 ────────────────
-        if interactive and not motion_enabled:
+        if interactive and runtime_state == "sit_to_stand":
+            preparation_duration = soft_start_duration
+            rise_start = preparation_duration + sit_to_stand_hold_duration
+            sequence_duration = rise_start + sit_to_stand_duration
+            if sit_to_stand_elapsed < preparation_duration:
+                sit_to_stand_stage = "preparing"
+                progress, progress_dot = _quintic_profile(
+                    sit_to_stand_elapsed,
+                    preparation_duration,
+                )
+                right_start = sit_to_stand_entry_right
+                left_start = sit_to_stand_entry_left
+                right_end = right_sit_pose
+                left_end = left_sit_pose
+            elif sit_to_stand_elapsed < rise_start:
+                sit_to_stand_stage = "seated_hold"
+                progress = 1.0
+                progress_dot = 0.0
+                right_start = right_sit_pose
+                left_start = left_sit_pose
+                right_end = right_sit_pose
+                left_end = left_sit_pose
+            elif sit_to_stand_elapsed < sequence_duration:
+                sit_to_stand_stage = "rising"
+                progress, progress_dot = _quintic_profile(
+                    sit_to_stand_elapsed - rise_start,
+                    sit_to_stand_duration,
+                )
+                right_start = right_sit_pose
+                left_start = left_sit_pose
+                right_end = np.array([stand_hip_angle, stand_knee_angle])
+                left_end = right_end
+            else:
+                sit_to_stand_stage = "complete"
+                progress = 1.0
+                progress_dot = 0.0
+                right_start = right_end = np.array(
+                    [stand_hip_angle, stand_knee_angle]
+                )
+                left_start = left_end = right_start
+                if not sit_to_stand_completed:
+                    sit_to_stand_repetitions += 1
+                    sit_to_stand_completed = True
+
+            right_sts_target = right_start + progress * (right_end - right_start)
+            left_sts_target = left_start + progress * (left_end - left_start)
+            right_sts_velocity = progress_dot * (right_end - right_start)
+            left_sts_velocity = progress_dot * (left_end - left_start)
+            human_hip_target, human_knee_target = right_sts_target
+            left_human_hip_target, left_human_knee_target = left_sts_target
+            human_hip_velocity, human_knee_velocity = right_sts_velocity
+            left_human_hip_velocity, left_human_knee_velocity = left_sts_velocity
+            sit_to_stand_progress = 100.0 * min(
+                sit_to_stand_elapsed / sequence_duration,
+                1.0,
+            )
+        elif interactive and not gait_mode:
             human_hip_target = stand_hip_angle
             human_knee_target = stand_knee_angle
             left_human_hip_target = stand_hip_angle
             left_human_knee_target = stand_knee_angle
+            human_hip_velocity = human_knee_velocity = 0.0
+            left_human_hip_velocity = left_human_knee_velocity = 0.0
+        elif interactive:
+            gait_targets = np.array(
+                [
+                    traj.hip_angle[step],
+                    traj.knee_angle[step],
+                    left_hip_angle[step],
+                    left_knee_angle[step],
+                ],
+                dtype=float,
+            )
+            gait_velocities = np.array(
+                [
+                    hip_vel_des[step],
+                    knee_vel_des[step],
+                    left_hip_vel_des[step],
+                    left_knee_vel_des[step],
+                ],
+                dtype=float,
+            ) * velocity_scale
+            human_targets = (
+                (1.0 - transition_weight) * human_transition_start
+                + transition_weight * gait_targets
+            )
+            human_velocities = (
+                transition_weight_dot
+                * (gait_targets - human_transition_start)
+                + transition_weight * gait_velocities
+            )
+            (
+                human_hip_target,
+                human_knee_target,
+                left_human_hip_target,
+                left_human_knee_target,
+            ) = human_targets
+            (
+                human_hip_velocity,
+                human_knee_velocity,
+                left_human_hip_velocity,
+                left_human_knee_velocity,
+            ) = human_velocities
         else:
             human_hip_target = traj.hip_angle[step]
             human_knee_target = traj.knee_angle[step]
             left_human_hip_target = left_hip_angle[step]
             left_human_knee_target = left_knee_angle[step]
+            human_hip_velocity = hip_vel_des[step]
+            human_knee_velocity = knee_vel_des[step]
+            left_human_hip_velocity = left_hip_vel_des[step]
+            left_human_knee_velocity = left_knee_vel_des[step]
         data.ctrl[hip_act_id] = human_hip_target
         data.ctrl[knee_act_id] = human_knee_target
         data.ctrl[left_hip_act_id] = left_human_hip_target
         data.ctrl[left_knee_act_id] = left_human_knee_target
 
         # ── 4-b. 보조 로봇 제어 및 토크 계산 ──────────────────────────
-        target_ankle = (
-            ankle_traj[step]
-            if not interactive or motion_enabled
-            else stand_ankle
-        )
-        left_target_ankle = (
-            left_ankle_traj[step]
-            if not interactive or motion_enabled
-            else left_stand_ankle
-        )
+        if interactive:
+            target_ankle = compute_ankle_trajectory(
+                hip_angles=np.array([human_hip_target]),
+                knee_angles=np.array([human_knee_target]),
+                thigh_length=seg.thigh_length,
+                shank_length=seg.shank_length,
+                hip_pos=right_hip_global,
+                scale_factor=scale,
+            )[0]
+            left_target_ankle = compute_ankle_trajectory(
+                hip_angles=np.array([left_human_hip_target]),
+                knee_angles=np.array([left_human_knee_target]),
+                thigh_length=seg.thigh_length,
+                shank_length=seg.shank_length,
+                hip_pos=left_hip_global,
+                scale_factor=scale,
+            )[0]
+        else:
+            target_ankle = ankle_traj[step]
+            left_target_ankle = left_ankle_traj[step]
         tau1_p = tau1_d = tau1_bias = np.nan
         tau2_p = tau2_d = tau2_bias = np.nan
         left_tau1_p = left_tau1_d = left_tau1_bias = np.nan
@@ -1388,10 +1650,11 @@ def run_simulation(
 
         if arm.robot_type == "exoskeleton":
             # Hip/knee 동축 외골격은 사람 관절 목표각을 직접 추종한다.
-            if interactive and not motion_enabled:
-                theta1_raw = stand_robot_targets[0]
-                theta2_raw = stand_robot_targets[1]
-                theta1_vel_raw = theta2_vel_raw = 0.0
+            if interactive:
+                theta1_raw = human_hip_target
+                theta2_raw = human_knee_target
+                theta1_vel_raw = human_hip_velocity
+                theta2_vel_raw = human_knee_velocity
             else:
                 theta1_raw = traj.hip_angle[step]
                 theta2_raw = traj.knee_angle[step]
@@ -1435,10 +1698,11 @@ def run_simulation(
             tau1 = tau1_pd + data.qfrc_bias[m1_qvel_id]
             tau2 = tau2_pd + data.qfrc_bias[m2_qvel_id]
 
-            if interactive and not motion_enabled:
-                left_theta1_raw = left_stand_robot_targets[0]
-                left_theta2_raw = left_stand_robot_targets[1]
-                left_theta1_vel_raw = left_theta2_vel_raw = 0.0
+            if interactive:
+                left_theta1_raw = left_human_hip_target
+                left_theta2_raw = left_human_knee_target
+                left_theta1_vel_raw = left_human_hip_velocity
+                left_theta2_vel_raw = left_human_knee_velocity
             else:
                 left_theta1_raw = left_hip_angle[step]
                 left_theta2_raw = left_knee_angle[step]
@@ -1510,7 +1774,28 @@ def run_simulation(
             assert open_chain_motor_vel is not None
             assert left_open_chain_targets is not None
             assert left_open_chain_motor_vel is not None
-            if interactive and not motion_enabled:
+            if interactive and runtime_state == "sit_to_stand":
+                dynamic_target = open_chain_ik(
+                    target_pos=target_ankle,
+                    base_pos=base_pos_arr,
+                    link1_length=link1_len,
+                    link2_length=link2_len,
+                    elbow_behind=arm.open_chain_elbow_behind,
+                )
+                if dynamic_target is None:
+                    ik_fail_count += 1
+                    dynamic_target = previous_dynamic_right_robot_target
+                dynamic_target = np.asarray(dynamic_target, dtype=float)
+                dynamic_delta = np.arctan2(
+                    np.sin(dynamic_target - previous_dynamic_right_robot_target),
+                    np.cos(dynamic_target - previous_dynamic_right_robot_target),
+                )
+                theta1_raw, theta2_raw = dynamic_target
+                theta1_vel_raw, theta2_vel_raw = (
+                    dynamic_delta / cfg.SIM_TIMESTEP
+                )
+                previous_dynamic_right_robot_target = dynamic_target.copy()
+            elif interactive and not gait_mode:
                 theta1_raw = stand_robot_targets[0]
                 theta2_raw = stand_robot_targets[1]
                 theta1_vel_raw = theta2_vel_raw = 0.0
@@ -1561,7 +1846,37 @@ def run_simulation(
             tau1 = tau1_pd + data.qfrc_bias[m1_qvel_id]
             tau2 = tau2_pd + data.qfrc_bias[m2_qvel_id]
 
-            if interactive and not motion_enabled:
+            if interactive and runtime_state == "sit_to_stand":
+                left_dynamic_target = open_chain_ik(
+                    target_pos=left_target_ankle,
+                    base_pos=left_base_pos,
+                    link1_length=link1_len,
+                    link2_length=link2_len,
+                    elbow_behind=arm.open_chain_elbow_behind,
+                )
+                if left_dynamic_target is None:
+                    ik_fail_count += 1
+                    left_dynamic_target = previous_dynamic_left_robot_target
+                left_dynamic_target = np.asarray(
+                    left_dynamic_target,
+                    dtype=float,
+                )
+                left_dynamic_delta = np.arctan2(
+                    np.sin(
+                        left_dynamic_target
+                        - previous_dynamic_left_robot_target
+                    ),
+                    np.cos(
+                        left_dynamic_target
+                        - previous_dynamic_left_robot_target
+                    ),
+                )
+                left_theta1_raw, left_theta2_raw = left_dynamic_target
+                left_theta1_vel_raw, left_theta2_vel_raw = (
+                    left_dynamic_delta / cfg.SIM_TIMESTEP
+                )
+                previous_dynamic_left_robot_target = left_dynamic_target.copy()
+            elif interactive and not gait_mode:
                 left_theta1_raw = left_stand_robot_targets[0]
                 left_theta2_raw = left_stand_robot_targets[1]
                 left_theta1_vel_raw = left_theta2_vel_raw = 0.0
@@ -1946,6 +2261,24 @@ def run_simulation(
             "therapy_mode": runtime_state if interactive else "batch_tracking",
             "cadence_spm": cadence_spm if interactive else nominal_cadence_spm,
             "patient_effort_percent": patient_effort if interactive else np.nan,
+            "active_effort_threshold_percent": (
+                initiation_threshold if interactive else np.nan
+            ),
+            "active_swing_phase": (
+                active_swing_phase if interactive else False
+            ),
+            "active_gate_blocked": (
+                active_gate_blocked if interactive else False
+            ),
+            "sit_to_stand_stage": (
+                sit_to_stand_stage if interactive else ""
+            ),
+            "sit_to_stand_progress_percent": (
+                sit_to_stand_progress if interactive else np.nan
+            ),
+            "sit_to_stand_rise_duration_s": (
+                sit_to_stand_duration if interactive else np.nan
+            ),
             "right_hip_support_percent": 100.0 * right_hip_support,
             "right_knee_support_percent": 100.0 * right_knee_support,
             "left_hip_support_percent": 100.0 * left_hip_support,
@@ -2003,7 +2336,7 @@ def run_simulation(
         tracking_check_enabled = (
             not interactive
             or (
-                motion_enabled
+                reference_active
                 and runtime_state != "safe_stop"
                 and transition_weight >= 0.999
             )
@@ -2057,8 +2390,11 @@ def run_simulation(
                     sys.exit(3)
 
         if interactive:
-            gait_distance += phase_increment
-            gait_cursor = gait_distance % cycle_steps
+            if gait_mode:
+                gait_distance += phase_increment
+                gait_cursor = gait_distance % cycle_steps
+            if runtime_state == "sit_to_stand":
+                sit_to_stand_elapsed += cfg.SIM_TIMESTEP
             transition_elapsed += cfg.SIM_TIMESTEP
             if simulation_step % 50 == 0:
                 try:
@@ -2066,13 +2402,27 @@ def run_simulation(
                     runtime_control["actual_state"] = runtime_state
                     runtime_control["sim_time"] = float(data.time)
                     runtime_control["gait_phase_pct"] = float(
-                        100.0 * gait_cursor / cycle_steps
+                        sit_to_stand_progress
+                        if runtime_state == "sit_to_stand"
+                        else 100.0 * gait_cursor / cycle_steps
                     )
                     runtime_control["step_count"] = int(
                         gait_distance / (0.5 * cycle_steps)
                     )
                     runtime_control["soft_start_pct"] = float(
                         100.0 * transition_weight
+                    )
+                    runtime_control["active_gate_blocked"] = bool(
+                        active_gate_blocked
+                    )
+                    runtime_control["active_swing_phase"] = bool(
+                        active_swing_phase
+                    )
+                    runtime_control["sit_to_stand_stage"] = (
+                        sit_to_stand_stage
+                    )
+                    runtime_control["sit_to_stand_repetitions"] = int(
+                        sit_to_stand_repetitions
                     )
                     runtime_control["right_hip_deg"] = float(
                         np.rad2deg(hip_angle_meas)
