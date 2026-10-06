@@ -121,7 +121,7 @@
       <geom name="open_chain_hip_mount" type="capsule" fromto="0 0 0 0 0.0800 0" size="0.012" rgba="0.25 0.25 0.25 1" group="1" contype="0" conaffinity="0" />
       <body name="open_chain_link1" pos="0 0 0">
         <joint name="motor1_joint" type="hinge" axis="0 -1 0" pos="0 0 0" damping="0.1" />
-        <inertial pos="0 0 -0.1049" mass="0.2500" diaginertia="0.000925 0.000925 0.000018" />
+        <inertial pos="0 0 -0.1155" mass="0.2500" diaginertia="0.001121 0.001121 0.000018" />
         <body name="open_chain_motor1_mass" pos="0 0 0">
           <inertial pos="0 0 0" mass="0.5210" diaginertia="0.000368 0.000516 0.000368" />
           <geom name="open_chain_motor1_housing" type="cylinder" fromto="0 -0.0191 0 0 0.0191 0" size="0.0445" material="mat_motor_housing" group="1" contype="0" conaffinity="0" />
@@ -138,15 +138,15 @@
           <geom name="open_chain_motor1_bolt_5" type="sphere" pos="-0.0109 -0.0381 -0.0189" size="0.0032" material="mat_motor_bolt" group="1" contype="0" conaffinity="0" />
           <geom name="open_chain_motor1_bolt_6" type="sphere" pos="0.0109 -0.0381 -0.0189" size="0.0032" material="mat_motor_bolt" group="1" contype="0" conaffinity="0" />
         </body>
-        <geom name="open_chain_link1_plate" type="box" pos="0 -0.0351 -0.1049" size="0.0130 0.0050 0.0729" material="mat_link_structure" group="1" contype="0" conaffinity="0" />
-        <geom name="open_chain_link1_accent" type="box" pos="0 -0.0409 -0.1049" size="0.0075 0.0012 0.0641" material="mat_link_accent" group="1" contype="0" conaffinity="0" />
+        <geom name="open_chain_link1_plate" type="box" pos="0 -0.0351 -0.1155" size="0.0130 0.0050 0.0835" material="mat_link_structure" group="1" contype="0" conaffinity="0" />
+        <geom name="open_chain_link1_accent" type="box" pos="0 -0.0409 -0.1155" size="0.0075 0.0012 0.0735" material="mat_link_accent" group="1" contype="0" conaffinity="0" />
         <geom name="open_chain_link1_proximal_bracket" type="capsule" fromto="0 -0.0351 0 0 -0.0351 -0.0320" size="0.0110" material="mat_link_structure" group="1" contype="0" conaffinity="0" />
-        <geom name="open_chain_link1_distal_bracket" type="capsule" fromto="0 -0.0351 -0.1777 0 -0.0351 -0.2097" size="0.0110" material="mat_link_structure" group="1" contype="0" conaffinity="0" />
+        <geom name="open_chain_link1_distal_bracket" type="capsule" fromto="0 -0.0351 -0.1990 0 -0.0351 -0.2310" size="0.0110" material="mat_link_structure" group="1" contype="0" conaffinity="0" />
         <geom name="open_chain_link1_proximal_pin" type="cylinder" fromto="0 -0.0421 0 0 -0.0281 0" size="0.0100" material="mat_link_pin" group="1" contype="0" conaffinity="0" />
-        <geom name="open_chain_link1_distal_pin" type="cylinder" fromto="0 -0.0421 -0.2097 0 -0.0281 -0.2097" size="0.0100" material="mat_link_pin" group="1" contype="0" conaffinity="0" />
-        <body name="open_chain_link2" pos="0 0 -0.2097">
+        <geom name="open_chain_link1_distal_pin" type="cylinder" fromto="0 -0.0421 -0.2310 0 -0.0281 -0.2310" size="0.0100" material="mat_link_pin" group="1" contype="0" conaffinity="0" />
+        <body name="open_chain_link2" pos="0 0 -0.2310">
           <joint name="motor2_joint" type="hinge" axis="0 -1 0" pos="0 0 0" damping="0.1" />
-          <inertial pos="0 0 -0.1053" mass="0.2500" diaginertia="0.000933 0.000933 0.000018" />
+          <inertial pos="0 0 -0.1160" mass="0.2500" diaginertia="0.001130 0.001130 0.000018" />
           <body name="open_chain_motor2_mass" pos="0 0 0">
             <inertial pos="0 0 0" mass="0.5210" diaginertia="0.000368 0.000516 0.000368" />
             <geom name="open_chain_motor2_housing" type="cylinder" fromto="0 -0.0191 0 0 0.0191 0" size="0.0445" material="mat_motor_housing" group="1" contype="0" conaffinity="0" />
@@ -163,16 +163,16 @@
             <geom name="open_chain_motor2_bolt_5" type="sphere" pos="-0.0109 -0.0381 -0.0189" size="0.0032" material="mat_motor_bolt" group="1" contype="0" conaffinity="0" />
             <geom name="open_chain_motor2_bolt_6" type="sphere" pos="0.0109 -0.0381 -0.0189" size="0.0032" material="mat_motor_bolt" group="1" contype="0" conaffinity="0" />
           </body>
-          <geom name="open_chain_link2_plate" type="box" pos="0 -0.0351 -0.1053" size="0.0130 0.0050 0.0733" material="mat_link_structure" group="1" contype="0" conaffinity="0" />
-          <geom name="open_chain_link2_accent" type="box" pos="0 -0.0409 -0.1053" size="0.0075 0.0012 0.0645" material="mat_link_accent" group="1" contype="0" conaffinity="0" />
+          <geom name="open_chain_link2_plate" type="box" pos="0 -0.0351 -0.1160" size="0.0130 0.0050 0.0840" material="mat_link_structure" group="1" contype="0" conaffinity="0" />
+          <geom name="open_chain_link2_accent" type="box" pos="0 -0.0409 -0.1160" size="0.0075 0.0012 0.0739" material="mat_link_accent" group="1" contype="0" conaffinity="0" />
           <geom name="open_chain_link2_proximal_bracket" type="capsule" fromto="0 -0.0351 0 0 -0.0351 -0.0320" size="0.0110" material="mat_link_structure" group="1" contype="0" conaffinity="0" />
-          <geom name="open_chain_link2_distal_bracket" type="capsule" fromto="0 -0.0351 -0.1786 0 -0.0351 -0.2106" size="0.0110" material="mat_link_structure" group="1" contype="0" conaffinity="0" />
+          <geom name="open_chain_link2_distal_bracket" type="capsule" fromto="0 -0.0351 -0.2000 0 -0.0351 -0.2320" size="0.0110" material="mat_link_structure" group="1" contype="0" conaffinity="0" />
           <geom name="open_chain_link2_proximal_pin" type="cylinder" fromto="0 -0.0421 0 0 -0.0281 0" size="0.0100" material="mat_link_pin" group="1" contype="0" conaffinity="0" />
-          <geom name="open_chain_link2_distal_pin" type="cylinder" fromto="0 -0.0421 -0.2106 0 -0.0281 -0.2106" size="0.0100" material="mat_link_pin" group="1" contype="0" conaffinity="0" />
-          <geom name="open_chain_ankle_cuff" type="capsule" fromto="0 0 -0.2106 0 0.0430 -0.2106" size="0.011" material="mat_cuff_connector" group="1" contype="0" conaffinity="0" />
+          <geom name="open_chain_link2_distal_pin" type="cylinder" fromto="0 -0.0421 -0.2320 0 -0.0281 -0.2320" size="0.0100" material="mat_link_pin" group="1" contype="0" conaffinity="0" />
+          <geom name="open_chain_ankle_cuff" type="capsule" fromto="0 0 -0.2320 0 0.0430 -0.2320" size="0.011" material="mat_cuff_connector" group="1" contype="0" conaffinity="0" />
           <site name="open_chain_elbow_site" pos="0 0 0" size="0.014" rgba="0.2 0.2 0.2 1" />
-          <site name="open_chain_ee_site" pos="0 0 -0.2106" size="0.018" rgba="1.0 0.2 0.2 0" />
-          <site name="bracket_end_site" pos="0 0.0800 -0.2106" size="0.012" rgba="1.0 0.8 0.1 0" />
+          <site name="open_chain_ee_site" pos="0 0 -0.2320" size="0.018" rgba="1.0 0.2 0.2 0" />
+          <site name="bracket_end_site" pos="0 0.0800 -0.2320" size="0.012" rgba="1.0 0.8 0.1 0" />
         </body>
       </body>
     </body>
@@ -278,7 +278,7 @@
       <geom name="open_chain_hip_mount_left" type="capsule" fromto="0 -0 0 0 -0.08 0" size="0.012" rgba="0.25 0.25 0.25 1" group="1" contype="0" conaffinity="0" />
       <body name="open_chain_link1_left" pos="0 -0 0">
         <joint name="motor1_joint_left" type="hinge" axis="0 -1 0" pos="0 -0 0" damping="0.1" />
-        <inertial pos="0 -0 -0.1049" mass="0.2500" diaginertia="0.000925 0.000925 0.000018" />
+        <inertial pos="0 -0 -0.1155" mass="0.2500" diaginertia="0.001121 0.001121 0.000018" />
         <body name="open_chain_motor1_mass_left" pos="0 -0 0">
           <inertial pos="0 -0 0" mass="0.5210" diaginertia="0.000368 0.000516 0.000368" />
           <geom name="open_chain_motor1_housing_left" type="cylinder" fromto="0 0.0191 0 0 -0.0191 0" size="0.0445" material="mat_motor_housing" group="1" contype="0" conaffinity="0" />
@@ -295,15 +295,15 @@
           <geom name="open_chain_motor1_bolt_5_left" type="sphere" pos="-0.0109 0.0381 -0.0189" size="0.0032" material="mat_motor_bolt" group="1" contype="0" conaffinity="0" />
           <geom name="open_chain_motor1_bolt_6_left" type="sphere" pos="0.0109 0.0381 -0.0189" size="0.0032" material="mat_motor_bolt" group="1" contype="0" conaffinity="0" />
         </body>
-        <geom name="open_chain_link1_plate_left" type="box" pos="0 0.0351 -0.1049" size="0.0130 0.0050 0.0729" material="mat_link_structure" group="1" contype="0" conaffinity="0" />
-        <geom name="open_chain_link1_accent_left" type="box" pos="0 0.0409 -0.1049" size="0.0075 0.0012 0.0641" material="mat_link_accent" group="1" contype="0" conaffinity="0" />
+        <geom name="open_chain_link1_plate_left" type="box" pos="0 0.0351 -0.1155" size="0.0130 0.0050 0.0835" material="mat_link_structure" group="1" contype="0" conaffinity="0" />
+        <geom name="open_chain_link1_accent_left" type="box" pos="0 0.0409 -0.1155" size="0.0075 0.0012 0.0735" material="mat_link_accent" group="1" contype="0" conaffinity="0" />
         <geom name="open_chain_link1_proximal_bracket_left" type="capsule" fromto="0 0.0351 0 0 0.0351 -0.032" size="0.0110" material="mat_link_structure" group="1" contype="0" conaffinity="0" />
-        <geom name="open_chain_link1_distal_bracket_left" type="capsule" fromto="0 0.0351 -0.1777 0 0.0351 -0.2097" size="0.0110" material="mat_link_structure" group="1" contype="0" conaffinity="0" />
+        <geom name="open_chain_link1_distal_bracket_left" type="capsule" fromto="0 0.0351 -0.199 0 0.0351 -0.231" size="0.0110" material="mat_link_structure" group="1" contype="0" conaffinity="0" />
         <geom name="open_chain_link1_proximal_pin_left" type="cylinder" fromto="0 0.0421 0 0 0.0281 0" size="0.0100" material="mat_link_pin" group="1" contype="0" conaffinity="0" />
-        <geom name="open_chain_link1_distal_pin_left" type="cylinder" fromto="0 0.0421 -0.2097 0 0.0281 -0.2097" size="0.0100" material="mat_link_pin" group="1" contype="0" conaffinity="0" />
-        <body name="open_chain_link2_left" pos="0 -0 -0.2097">
+        <geom name="open_chain_link1_distal_pin_left" type="cylinder" fromto="0 0.0421 -0.231 0 0.0281 -0.231" size="0.0100" material="mat_link_pin" group="1" contype="0" conaffinity="0" />
+        <body name="open_chain_link2_left" pos="0 -0 -0.231">
           <joint name="motor2_joint_left" type="hinge" axis="0 -1 0" pos="0 -0 0" damping="0.1" />
-          <inertial pos="0 -0 -0.1053" mass="0.2500" diaginertia="0.000933 0.000933 0.000018" />
+          <inertial pos="0 -0 -0.116" mass="0.2500" diaginertia="0.001130 0.001130 0.000018" />
           <body name="open_chain_motor2_mass_left" pos="0 -0 0">
             <inertial pos="0 -0 0" mass="0.5210" diaginertia="0.000368 0.000516 0.000368" />
             <geom name="open_chain_motor2_housing_left" type="cylinder" fromto="0 0.0191 0 0 -0.0191 0" size="0.0445" material="mat_motor_housing" group="1" contype="0" conaffinity="0" />
@@ -320,16 +320,16 @@
             <geom name="open_chain_motor2_bolt_5_left" type="sphere" pos="-0.0109 0.0381 -0.0189" size="0.0032" material="mat_motor_bolt" group="1" contype="0" conaffinity="0" />
             <geom name="open_chain_motor2_bolt_6_left" type="sphere" pos="0.0109 0.0381 -0.0189" size="0.0032" material="mat_motor_bolt" group="1" contype="0" conaffinity="0" />
           </body>
-          <geom name="open_chain_link2_plate_left" type="box" pos="0 0.0351 -0.1053" size="0.0130 0.0050 0.0733" material="mat_link_structure" group="1" contype="0" conaffinity="0" />
-          <geom name="open_chain_link2_accent_left" type="box" pos="0 0.0409 -0.1053" size="0.0075 0.0012 0.0645" material="mat_link_accent" group="1" contype="0" conaffinity="0" />
+          <geom name="open_chain_link2_plate_left" type="box" pos="0 0.0351 -0.116" size="0.0130 0.0050 0.0840" material="mat_link_structure" group="1" contype="0" conaffinity="0" />
+          <geom name="open_chain_link2_accent_left" type="box" pos="0 0.0409 -0.116" size="0.0075 0.0012 0.0739" material="mat_link_accent" group="1" contype="0" conaffinity="0" />
           <geom name="open_chain_link2_proximal_bracket_left" type="capsule" fromto="0 0.0351 0 0 0.0351 -0.032" size="0.0110" material="mat_link_structure" group="1" contype="0" conaffinity="0" />
-          <geom name="open_chain_link2_distal_bracket_left" type="capsule" fromto="0 0.0351 -0.1786 0 0.0351 -0.2106" size="0.0110" material="mat_link_structure" group="1" contype="0" conaffinity="0" />
+          <geom name="open_chain_link2_distal_bracket_left" type="capsule" fromto="0 0.0351 -0.2 0 0.0351 -0.232" size="0.0110" material="mat_link_structure" group="1" contype="0" conaffinity="0" />
           <geom name="open_chain_link2_proximal_pin_left" type="cylinder" fromto="0 0.0421 0 0 0.0281 0" size="0.0100" material="mat_link_pin" group="1" contype="0" conaffinity="0" />
-          <geom name="open_chain_link2_distal_pin_left" type="cylinder" fromto="0 0.0421 -0.2106 0 0.0281 -0.2106" size="0.0100" material="mat_link_pin" group="1" contype="0" conaffinity="0" />
-          <geom name="open_chain_ankle_cuff_left" type="capsule" fromto="0 -0 -0.2106 0 -0.043 -0.2106" size="0.011" material="mat_cuff_connector" group="1" contype="0" conaffinity="0" />
+          <geom name="open_chain_link2_distal_pin_left" type="cylinder" fromto="0 0.0421 -0.232 0 0.0281 -0.232" size="0.0100" material="mat_link_pin" group="1" contype="0" conaffinity="0" />
+          <geom name="open_chain_ankle_cuff_left" type="capsule" fromto="0 -0 -0.232 0 -0.043 -0.232" size="0.011" material="mat_cuff_connector" group="1" contype="0" conaffinity="0" />
           <site name="open_chain_elbow_site_left" pos="0 -0 0" size="0.014" rgba="0.2 0.2 0.2 1" />
-          <site name="open_chain_ee_site_left" pos="0 -0 -0.2106" size="0.018" rgba="1.0 0.2 0.2 0" />
-          <site name="bracket_end_site_left" pos="0 -0.08 -0.2106" size="0.012" rgba="1.0 0.8 0.1 0" />
+          <site name="open_chain_ee_site_left" pos="0 -0 -0.232" size="0.018" rgba="1.0 0.2 0.2 0" />
+          <site name="bracket_end_site_left" pos="0 -0.08 -0.232" size="0.012" rgba="1.0 0.8 0.1 0" />
         </body>
       </body>
     </body>
